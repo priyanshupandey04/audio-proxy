@@ -1,8 +1,14 @@
 FROM node:18-slim
 
-# Install Python, ffmpeg and yt-dlp
+# Install Python3 (with a "python" shim), ffmpeg and yt-dlp
 RUN apt-get update && \
-    apt-get install -y python3 python3-venv ffmpeg curl yt-dlp && \
+    apt-get install -y \
+      python3 \
+      python3-venv \
+      python-is-python3 \
+      ffmpeg \
+      curl \
+      yt-dlp && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -15,5 +21,4 @@ RUN npm install
 COPY . .
 
 EXPOSE 8080
-
 CMD ["npm", "start"]
