@@ -20,17 +20,19 @@ app.get('/api/audio-hls/:videoId', async (req, res) => {
   if (!videoId) return res.status(400).json({ error: 'Missing videoId' });
 
   try {
-    const ua = req.get('user-agent') || 'mozilla/5.0';
-    const info = await youtubedl(
-      `https://www.youtube.com/watch?v=${videoId}`, {
-        dumpSingleJson: true,
-        noCheckCertificates: true,
-        addHeader: [
-          'referer:youtube.com',
-          `user-agent:${ua}`
-        ]
-      }
-    );
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    const ua  = req.get('user-agent') || 'mozilla/5.0';
+
+    const info = await youtubedl(url, {
+      dumpSingleJson:     true,
+      geoBypass:          true,          // <-- enable geo‑bypass
+      geoBypassCountry:  'US',           // <-- pretend origin in US
+      noCheckCertificates:true,
+      addHeader: [
+        'referer:youtube.com',
+        `user-agent:${ua}`
+      ]
+    });
 
     const hlsAudio = (info.formats || []).find(f =>
       f.protocol?.includes('m3u8') &&
@@ -43,6 +45,7 @@ app.get('/api/audio-hls/:videoId', async (req, res) => {
 
     const manifestResp = await axios.get(hlsAudio.url);
     const server = getBaseUrl(req);
+
     const proxied = manifestResp.data.replace(
       /(https?:\/\/[^\s"']+?)(?=\r?\n)/g,
       url => `${server}/proxy/segment?url=${encodeURIComponent(url)}`
@@ -57,7 +60,7 @@ app.get('/api/audio-hls/:videoId', async (req, res) => {
   }
 });
 
-// 2) Generic manifest proxy (if you ever need it)
+// 2) Generic manifest proxy
 app.get('/proxy/manifest', async (req, res) => {
   const manifestUrl = req.query.url;
   if (!manifestUrl) return res.status(400).json({ error: 'Missing manifest URL' });
@@ -87,7 +90,6 @@ app.get('/proxy/segment', async (req, res) => {
     const upstream = await axios.get(segmentUrl, { responseType: 'stream' });
     res.setHeader('Content-Type', upstream.headers['content-type']);
     return upstream.data.pipe(res);
-
   } catch (err) {
     console.error('❌ segment proxy error:', err.message);
     return res.status(500).json({ error: 'Failed to proxy segment' });
